@@ -1,83 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Water & Soil Monitoring Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<title>Water & Soil Monitoring Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      padding: 20px;
-    }
-    h1, h2 { color: #2c3e50; }
-    .card {
-      background: #fff;
-      padding: 15px;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,.1);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      padding: 8px;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
-    }
-    th {
-      background: #3498db;
-      color: white;
-    }
-    button {
-      padding: 6px 10px;
-      margin-left: 6px;
-      cursor: pointer;
-    }
-    .total {
-      font-weight: bold;
-      color: #27ae60;
-    }
+<style>
+  /* BASIC STYLES */
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    padding: 0;
+    margin: 0;
+  }
+  h1, h2 { color: #2c3e50; margin: 0 0 10px 0; }
+  
+  /* TOPBAR */
+  .topbar {
+    background: #3498db;
+    color: white;
+    padding: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    align-items: center;
+  }
+  .topbar button {
+    background: white;
+    color: #3498db;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-weight: bold;
+    flex: 1 1 auto;
+    min-width: 120px;
+  }
 
-    /* MODAL */
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      justify-content: center;
-      align-items: center;
+  /* CARD */
+  .card {
+    background: #fff;
+    padding: 15px;
+    margin: 15px 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.1);
+    overflow-x: auto;
+  }
+
+  /* TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 300px;
+  }
+  th, td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
+  }
+  th {
+    background: #3498db;
+    color: white;
+    position: sticky;
+    top: 0;
+  }
+  .total {
+    font-weight: bold;
+    color: #27ae60;
+    text-align: right;
+    margin-top: 10px;
+  }
+
+  /* INPUTS & BUTTONS */
+  input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+  }
+  button {
+    font-size: 16px;
+  }
+
+  /* MODAL */
+  .modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    overflow-y: auto;
+  }
+  .modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 600px;
+    box-sizing: border-box;
+  }
+  .close {
+    float: right;
+    font-size: 24px;
+    cursor: pointer;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    h1 { font-size: 20px; }
+    h2 { font-size: 18px; }
+    .topbar {
+      flex-direction: column;
+      gap: 8px;
     }
-    .modal-content {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 700px;
-    }
-    .close {
-      float: right;
-      font-size: 20px;
-      cursor: pointer;
-    }
-  </style>
+    .topbar button { min-width: 100%; }
+    th, td { font-size: 14px; padding: 6px; }
+    input, select, textarea, button { font-size: 14px; padding: 6px; }
+  }
+</style>
 </head>
 
 <body>
 
-<h1>🌱 Water & Soil Monitoring Dashboard</h1>
+<!-- TOPBAR -->
+<div class="topbar">
+  <button onclick="openReportModal()">Make Report</button>
+  <button onclick="openViewReportModal()">View Reports</button>
+</div>
 
-<!-- 🌱 SOIL FILTER -->
+<h1 style="padding:0 10px;">🌱 Water & Soil Monitoring Dashboard</h1>
+
+<!-- SOIL FILTER -->
 <div class="card">
   <h2>📅 Soil Data Filter</h2>
   <input type="date" id="soilDate">
@@ -100,7 +167,7 @@
   </table>
 </div>
 
-<!-- 💧 WATER FILTER -->
+<!-- WATER FILTER -->
 <div class="card">
   <h2>📅 Water Data Filter</h2>
   <input type="date" id="waterDate">
@@ -126,7 +193,7 @@
   </p>
 </div>
 
-<!-- 📊 MODAL -->
+<!-- GRAPH MODAL -->
 <div class="modal" id="graphModal">
   <div class="modal-content">
     <span class="close" onclick="closeModal()">✖</span>
@@ -134,6 +201,46 @@
     <canvas id="graphCanvas"></canvas>
   </div>
 </div>
+
+<!-- REPORT MODAL -->
+<div class="modal" id="reportModal">
+  <div class="modal-content">
+    <span class="close" onclick="closeReportModal()">✖</span>
+    <h2>Make Water Report</h2>
+    <label>Date:</label>
+    <input type="date" id="reportDate" onchange="updateTimeDropdown()">
+    <label>Time:</label>
+    <select id="reportTime" onchange="updateLiters()">
+      <option value="">Select time</option>
+    </select>
+    <label>Water Details (Liters):</label>
+    <input type="number" id="reportLiters" step="0.001" readonly>
+    <label>Remarks:</label>
+    <textarea id="reportRemarks" rows="3"></textarea>
+    <button onclick="saveReport()">Save Report</button>
+  </div>
+</div>
+
+<!-- VIEW REPORT MODAL -->
+<div class="modal" id="viewReportModal">
+  <div class="modal-content">
+    <span class="close" onclick="closeViewReportModal()">✖</span>
+    <h2>Water Reports</h2>
+    <button onclick="exportReportsToExcel()">Export to Excel</button>
+    <table id="reportTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Liters</th>
+          <th>Remarks</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
 
 <script>
   // Firebase config
@@ -146,7 +253,6 @@
     messagingSenderId: "365213006727",
     appId: "1:365213006727:web:a219011b5e7eab1d8eb122"
   };
-
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
@@ -155,20 +261,24 @@
   const totalLitersSpan = document.getElementById("totalLiters");
   const soilDate = document.getElementById("soilDate");
   const waterDate = document.getElementById("waterDate");
+  const reportDate = document.getElementById("reportDate");
+  const reportTime = document.getElementById("reportTime");
+  const reportLiters = document.getElementById("reportLiters");
 
   const today = new Date().toISOString().split("T")[0];
   soilDate.value = today;
   waterDate.value = today;
+  reportDate.value = today;
 
   let chart;
 
+  // ------------------ Load Data ------------------
   loadSoilData();
   loadWaterData();
 
   function loadSoilData() {
     const date = soilDate.value;
     soilTable.innerHTML = "";
-
     db.ref("soilData/" + date).once("value", snap => {
       if (!snap.exists()) {
         soilTable.innerHTML = `<tr><td colspan="4">No data</td></tr>`;
@@ -176,13 +286,12 @@
       }
       snap.forEach(t => {
         const d = t.val();
-        soilTable.innerHTML += `
-          <tr>
-            <td>${date}</td>
-            <td>${t.key}</td>
-            <td>${d.moistureStr}</td>
-            <td>${d.soilRaw}</td>
-          </tr>`;
+        soilTable.innerHTML += `<tr>
+          <td>${date}</td>
+          <td>${t.key}</td>
+          <td>${d.moistureStr}</td>
+          <td>${d.soilRaw}</td>
+        </tr>`;
       });
     });
   }
@@ -191,7 +300,6 @@
     const date = waterDate.value;
     waterTable.innerHTML = "";
     let total = 0;
-
     db.ref("waterdata/" + date).once("value", snap => {
       if (!snap.exists()) {
         waterTable.innerHTML = `<tr><td colspan="3">No data</td></tr>`;
@@ -201,50 +309,34 @@
       snap.forEach(t => {
         const d = t.val();
         total += Number(d.liters);
-        waterTable.innerHTML += `
-          <tr>
-            <td>${date}</td>
-            <td>${t.key}</td>
-            <td>${Number(d.liters).toFixed(3)}</td>
-          </tr>`;
+        waterTable.innerHTML += `<tr>
+          <td>${date}</td>
+          <td>${t.key}</td>
+          <td>${Number(d.liters).toFixed(3)}</td>
+        </tr>`;
       });
       totalLitersSpan.textContent = total.toFixed(3);
     });
   }
 
-  // 📊 SOIL GRAPH
- function showSoilGraph() {
+  // ------------------ Graph Functions ------------------
+  function showSoilGraph() {
     const date = soilDate.value;
-    const labels = [];
-    const data = [];
-
+    const labels = [], data = [];
     db.ref("soilData/" + date).once("value", snap => {
       if (!snap.exists()) return;
-
       snap.forEach(t => {
         labels.push(t.key);
-
-        // Convert "65%" → 65
-        const moistureStr = t.val().moistureStr || "0%";
-        const moistureValue = parseFloat(moistureStr.replace("%", ""));
+        const moistureValue = parseFloat((t.val().moistureStr || "0%").replace("%",""));
         data.push(moistureValue);
       });
-
-      openModal(
-        "Soil Moisture (%)",
-        labels,
-        data,
-        "Moisture (%)"
-      );
+      openModal("Soil Moisture (%)", labels, data, "Moisture (%)");
     });
   }
 
-  // 📊 WATER GRAPH
   function showWaterGraph() {
     const date = waterDate.value;
-    const labels = [];
-    const data = [];
-
+    const labels = [], data = [];
     db.ref("waterdata/" + date).once("value", snap => {
       snap.forEach(t => {
         labels.push(t.key);
@@ -257,27 +349,144 @@
   function openModal(title, labels, data, label) {
     document.getElementById("graphTitle").textContent = title;
     document.getElementById("graphModal").style.display = "flex";
-
     if (chart) chart.destroy();
-
     chart = new Chart(graphCanvas, {
       type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label,
-          data,
-          borderColor: "#3498db",
-          fill: false
-        }]
+      data: { labels, datasets: [{ label, data, borderColor:"#3498db", fill:false }] }
+    });
+  }
+  function closeModal() { document.getElementById("graphModal").style.display = "none"; }
+
+  // ------------------ Report Modals ------------------
+  function openReportModal() {
+    document.getElementById("reportModal").style.display = "flex";
+    updateTimeDropdown(); // populate time dropdown
+  }
+  function closeReportModal() { document.getElementById("reportModal").style.display = "none"; }
+  function openViewReportModal() { 
+    document.getElementById("viewReportModal").style.display = "flex"; 
+    loadReports();
+  }
+  function closeViewReportModal() { document.getElementById("viewReportModal").style.display = "none"; }
+
+  // ------------------ Update Time Dropdown ------------------
+function updateTimeDropdown() {
+  const date = reportDate.value;
+  reportTime.innerHTML = `<option value="">Select time</option>`;
+  reportLiters.value = "";
+
+  if (!date) return;
+
+  db.ref("waterdata/" + date).once("value", snap=>{
+    if(!snap.exists()){
+      reportTime.innerHTML = `<option value="">No data available</option>`;
+      return;
+    }
+    snap.forEach(t=>{
+      const time = t.key;
+      reportTime.innerHTML += `<option value="${time}">${time}</option>`;
+    });
+  });
+}
+
+  // ------------------ Save Report ------------------
+  function saveReport() {
+    const date = reportDate.value;
+    const time = reportTime.value;
+    const liters = parseFloat(reportLiters.value);
+    const remarks = document.getElementById("reportRemarks").value;
+
+    if(!date || !time || isNaN(liters)){
+      alert("Please fill all required fields!");
+      return;
+    }
+
+    db.ref("waterReports/"+date+"/"+time).set({liters, remarks}, err=>{
+      if(err) alert("Error saving report: "+err);
+      else {
+        alert("Report saved!");
+        reportLiters.value="";
+        document.getElementById("reportRemarks").value="";
+        closeReportModal();
       }
     });
   }
 
-  function closeModal() {
-    document.getElementById("graphModal").style.display = "none";
+  // ------------------ Load Reports ------------------
+  function loadReports() {
+    const tbody = document.querySelector("#reportTable tbody");
+    tbody.innerHTML = "";
+    db.ref("waterReports").once("value", snap=>{
+      if(!snap.exists()){ tbody.innerHTML=`<tr><td colspan="4">No reports</td></tr>`; return; }
+      snap.forEach(dateSnap=>{
+        const date = dateSnap.key;
+        dateSnap.forEach(timeSnap=>{
+          const time = timeSnap.key;
+          const d = timeSnap.val();
+          tbody.innerHTML += `<tr>
+            <td>${date}</td>
+            <td>${time}</td>
+            <td>${Number(d.liters).toFixed(3)}</td>
+            <td>${d.remarks || ""}</td>
+          </tr>`;
+        });
+      });
+    });
   }
-</script>
 
+
+  function updateLiters() {
+  const date = reportDate.value;
+  const time = reportTime.value;
+  if (!date || !time) {
+    reportLiters.value = "";
+    return;
+  }
+
+  db.ref("waterdata/" + date + "/" + time).once("value", snap => {
+    if (snap.exists()) {
+      reportLiters.value = Number(snap.val().liters).toFixed(3);
+    } else {
+      reportLiters.value = "";
+    }
+  });
+}
+
+function exportReportsToExcel() {
+  const table = document.getElementById("reportTable");
+  let csv = [];
+  
+  // Get headers
+  const headers = [];
+  table.querySelectorAll("thead th").forEach(th => headers.push(th.innerText));
+  csv.push(headers.join(","));
+
+  // Get table rows
+  table.querySelectorAll("tbody tr").forEach(tr => {
+    const row = [];
+    tr.querySelectorAll("td").forEach(td => {
+      // Escape commas and quotes
+      let cell = td.innerText.replace(/"/g, '""');
+      if (cell.indexOf(',') > -1) cell = `"${cell}"`;
+      row.push(cell);
+    });
+    csv.push(row.join(","));
+  });
+
+  // Create download link
+  const csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+  const downloadLink = document.createElement("a");
+  downloadLink.download = `WaterReports_${new Date().toISOString().slice(0,10)}.csv`;
+  downloadLink.href = window.URL.createObjectURL(csvFile);
+  downloadLink.style.display = "none";
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+}
+
+
+
+
+</script>
 </body>
 </html>
