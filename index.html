@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Water & Soil Monitoring Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+    h1, h2 { color: #2c3e50; }
+    .card {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background: #3498db;
+      color: white;
+    }
+    button {
+      padding: 6px 10px;
+      margin-left: 6px;
+      cursor: pointer;
+    }
+    .total {
+      font-weight: bold;
+      color: #27ae60;
+    }
+
+    /* MODAL */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 700px;
+    }
+    .close {
+      float: right;
+      font-size: 20px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🌱 Water & Soil Monitoring Dashboard</h1>
+
+<!-- 🌱 SOIL FILTER -->
+<div class="card">
+  <h2>📅 Soil Data Filter</h2>
+  <input type="date" id="soilDate">
+  <button onclick="loadSoilData()">Load Soil Data</button>
+  <button onclick="showSoilGraph()">Show Graph</button>
+</div>
+
+<div class="card">
+  <h2>Soil Moisture Data</h2>
+  <table id="soilTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Moisture</th>
+        <th>Raw</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- 💧 WATER FILTER -->
+<div class="card">
+  <h2>📅 Water Data Filter</h2>
+  <input type="date" id="waterDate">
+  <button onclick="loadWaterData()">Load Water Data</button>
+  <button onclick="showWaterGraph()">Show Graph</button>
+</div>
+
+<div class="card">
+  <h2>Water Usage Data</h2>
+  <table id="waterTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Liters</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p class="total">
+    Total Water Used:
+    <span id="totalLiters">0.000</span> L
+  </p>
+</div>
+
+<!-- 📊 MODAL -->
+<div class="modal" id="graphModal">
+  <div class="modal-content">
+    <span class="close" onclick="closeModal()">✖</span>
+    <h2 id="graphTitle"></h2>
+    <canvas id="graphCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyBDO8YDCXINdRQJ6-6YLugZcVD2JvP89Ao",
+    authDomain: "wateryield-b790e.firebaseapp.com",
+    databaseURL: "https://wateryield-b790e-default-rtdb.firebaseio.com",
+    projectId: "wateryield-b790e",
+    storageBucket: "wateryield-b790e.firebasestorage.app",
+    messagingSenderId: "365213006727",
+    appId: "1:365213006727:web:a219011b5e7eab1d8eb122"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const soilTable = document.querySelector("#soilTable tbody");
+  const waterTable = document.querySelector("#waterTable tbody");
+  const totalLitersSpan = document.getElementById("totalLiters");
+  const soilDate = document.getElementById("soilDate");
+  const waterDate = document.getElementById("waterDate");
+
+  const today = new Date().toISOString().split("T")[0];
+  soilDate.value = today;
+  waterDate.value = today;
+
+  let chart;
+
+  loadSoilData();
+  loadWaterData();
+
+  function loadSoilData() {
+    const date = soilDate.value;
+    soilTable.innerHTML = "";
+
+    db.ref("soilData/" + date).once("value", snap => {
+      if (!snap.exists()) {
+        soilTable.innerHTML = `<tr><td colspan="4">No data</td></tr>`;
+        return;
+      }
+      snap.forEach(t => {
+        const d = t.val();
+        soilTable.innerHTML += `
+          <tr>
+            <td>${date}</td>
+            <td>${t.key}</td>
+            <td>${d.moistureStr}</td>
+            <td>${d.soilRaw}</td>
+          </tr>`;
+      });
+    });
+  }
+
+  function loadWaterData() {
+    const date = waterDate.value;
+    waterTable.innerHTML = "";
+    let total = 0;
+
+    db.ref("waterdata/" + date).once("value", snap => {
+      if (!snap.exists()) {
+        waterTable.innerHTML = `<tr><td colspan="3">No data</td></tr>`;
+        totalLitersSpan.textContent = "0.000";
+        return;
+      }
+      snap.forEach(t => {
+        const d = t.val();
+        total += Number(d.liters);
+        waterTable.innerHTML += `
+          <tr>
+            <td>${date}</td>
+            <td>${t.key}</td>
+            <td>${Number(d.liters).toFixed(3)}</td>
+          </tr>`;
+      });
+      totalLitersSpan.textContent = total.toFixed(3);
+    });
+  }
+
+  // 📊 SOIL GRAPH
+ function showSoilGraph() {
+    const date = soilDate.value;
+    const labels = [];
+    const data = [];
+
+    db.ref("soilData/" + date).once("value", snap => {
+      if (!snap.exists()) return;
+
+      snap.forEach(t => {
+        labels.push(t.key);
+
+        // Convert "65%" → 65
+        const moistureStr = t.val().moistureStr || "0%";
+        const moistureValue = parseFloat(moistureStr.replace("%", ""));
+        data.push(moistureValue);
+      });
+
+      openModal(
+        "Soil Moisture (%)",
+        labels,
+        data,
+        "Moisture (%)"
+      );
+    });
+  }
+
+  // 📊 WATER GRAPH
+  function showWaterGraph() {
+    const date = waterDate.value;
+    const labels = [];
+    const data = [];
+
+    db.ref("waterdata/" + date).once("value", snap => {
+      snap.forEach(t => {
+        labels.push(t.key);
+        data.push(Number(t.val().liters));
+      });
+      openModal("Water Usage Graph", labels, data, "Liters");
+    });
+  }
+
+  function openModal(title, labels, data, label) {
+    document.getElementById("graphTitle").textContent = title;
+    document.getElementById("graphModal").style.display = "flex";
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(graphCanvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data,
+          borderColor: "#3498db",
+          fill: false
+        }]
+      }
+    });
+  }
+
+  function closeModal() {
+    document.getElementById("graphModal").style.display = "none";
+  }
+</script>
+
+</body>
+</html>
