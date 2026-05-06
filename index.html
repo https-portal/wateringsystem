@@ -2,263 +2,352 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Water & Soil Monitoring Dashboard</title>
+<title>Farm Management Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-<!-- Chart.js -->
+<!-- Chart.js & Excel Library -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-  /* BASIC STYLES */
-  body {
-    font-family: Arial, sans-serif;
-    background: #f4f6f8;
-    padding: 0;
-    margin: 0;
-  }
-  h1, h2 { color: #2c3e50; margin: 0 0 10px 0; }
+  :root { --primary: #3498db; --secondary: #27ae60; --bg: #f4f7f6; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: #333; }
+  .container { max-width: 1000px; margin: auto; }
+  h1 { font-size: 1.5rem; text-align: center; color: #2c3e50; margin-bottom: 20px; }
+
+  .card { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; }
+  h2, h3 { color: #2c3e50; margin-top: 0; display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
   
-  /* TOPBAR */
-  .topbar {
-    background: #3498db;
-    color: white;
-    padding: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 10px;
-    align-items: center;
-  }
-.topbar button {
-  background: #fff;
-  color: #3498db;
-  border: 2px solid #3498db;
-  border-radius: 6px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: 0.3s;
-  flex: 1 1 auto;
-  min-width: 120px;
-}
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 10px; }
+  label { font-weight: 600; display: block; margin-bottom: 4px; font-size: 13px; color: #666; }
+  input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; outline: none; }
+  input:focus { border-color: var(--primary); }
 
+  .table-container { overflow-x: auto; margin-top: 10px; border-radius: 8px; border: 1px solid #eee; }
+  table { width: 100%; border-collapse: collapse; min-width: 300px; }
+  th { background: #f8f9fa; color: #555; padding: 12px; text-align: left; font-size: 13px; border-bottom: 2px solid #eee; }
+  td { padding: 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
 
-.topbar button:hover {
-  background: #3498db;
-  color: #fff;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
-  /* CARD */
-  .card {
-    background: #fff;
-    padding: 15px;
-    margin: 15px 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.1);
-    overflow-x: auto;
+  .btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-add { background: var(--secondary); color: white; width: 100%; margin-top: 10px; }
+  .btn-export { background: #e67e22; color: white; width: 100%; font-size: 16px; margin-top: 20px; padding: 15px; text-transform: uppercase; }
+  .btn:active { transform: scale(0.98); }
+
+  /* Sensor Date Range Filter */
+  .range-filter { display: flex; flex-direction: column; gap: 10px; background: #ebf5fb; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+  .range-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  
+  .sensor-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+  @media (min-width: 768px) {
+    .sensor-grid { grid-template-columns: 1fr 1fr; }
+    .range-filter { flex-direction: row; align-items: flex-end; }
   }
 
-  /* TABLE */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 300px;
-  }
-  th, td {
-    padding: 8px;
-    border-bottom: 1px solid #ddd;
-    text-align: center;
-  }
-  th {
-    background: #3498db;
-    color: white;
-    position: sticky;
-    top: 0;
-  }
-  .total {
-    font-weight: bold;
-    color: #27ae60;
-    text-align: right;
-    margin-top: 10px;
-  }
-
-  /* INPUTS & BUTTONS */
-  input, select, textarea {
-    width: 100%;
-    padding: 8px;
-    margin-top: 4px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-  }
-  button {
-    font-size: 16px;
-  }
-
-  /* MODAL */
-  .modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    justify-content: center;
-    align-items: center;
-    padding: 10px;
-    overflow-y: auto;
-  }
-  .modal-content {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 100%;
-    max-width: 600px;
-    box-sizing: border-box;
-  }
-  .close {
-    float: right;
-    font-size: 24px;
-    cursor: pointer;
-  }
-
-  /* RESPONSIVE */
-  @media (max-width: 600px) {
-    h1 { font-size: 20px; }
-    h2 { font-size: 18px; }
-    .topbar {
-      flex-direction: column;
-      gap: 8px;
-    }
-    .topbar button { min-width: 100%; }
-    th, td { font-size: 14px; padding: 6px; }
-    input, select, textarea, button { font-size: 14px; padding: 6px; }
-  }
-
-
-  input[type="date"] {
-  max-width: 150px;   /* adjust width */
-  font-size: 14px;    /* smaller text */
-  padding: 4px 6px;   /* smaller padding */
-}
-
+  /* Modal */
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 2000; padding: 10px; }
+  .modal-content { background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 600px; position: relative; }
 </style>
 </head>
-
 <body>
 
-<!-- TOPBAR -->
-<div class="topbar">
-  <button onclick="openReportModal()">Make Report</button>
-  <button onclick="openViewReportModal()">View Reports</button>
+<div class="container">
+  <h1>🌱 Farm Dashboard</h1>
+
+ <!-- 1. IDENTIFICATION -->
+  <div class="card">
+    <div class="form-grid">
+      <div class="field"><label>Plot ID</label><input type="text" id="blockID" placeholder="ID"></div>
+      <div class="field"><label>Plant</label><input type="text" id="plantName" placeholder="Name"></div>
+      <div class="field">
+        <label>Type</label>
+        <select id="plantType">
+          <option>Grains</option><option>Legumes</option><option>Tube/Root</option><option>Leafy Greens</option><option>Fruits</option>
+        </select>
+      </div>
+    </div>
+
+
+
+
+<!-- Sa sulod sa IDENTIFICATION card -->
+<div style="display: flex; gap: 10px; margin-top: 15px;">
+  <button class="btn btn-primary" onclick="savePlantData()" style="flex: 1;">💾 Save Plant Info</button>
+  <button class="btn" onclick="openPlantModal()" style="flex: 1; background: #9b59b6; color: white;">📋 Show Plants</button>
 </div>
 
-<h1 style="padding:0 10px;">🌱 Water & Soil Monitoring Dashboard</h1>
-
-<!-- SOIL FILTER -->
-<div class="card">
-  <h2>📅 Soil Data Filter</h2>
-  <input type="date" id="soilDate">
-  <button onclick="loadSoilData()">Load Soil Data</button>
-  <button onclick="showSoilGraph()">Show Graph</button>
-</div>
-
-<div class="card">
-  <h2>Soil Moisture Data</h2>
-  <table id="soilTable">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>Moisture</th>
-        <th>Raw</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<!-- WATER FILTER -->
-<div class="card">
-  <h2>📅 Water Data Filter</h2>
-  <input type="date" id="waterDate">
-  <button onclick="loadWaterData()">Load Water Data</button>
-  <button onclick="showWaterGraph()">Show Graph</button>
-</div>
-
-<div class="card">
-  <h2>Water Usage Data</h2>
-  <table id="waterTable">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Time</th>
-        <th>Liters</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <p class="total">
-    Total Water Used:
-    <span id="totalLiters">0.000</span> L
-  </p>
-</div>
-
-<!-- GRAPH MODAL -->
-<div class="modal" id="graphModal">
-  <div class="modal-content">
-    <span class="close" onclick="closeModal()">✖</span>
-    <h2 id="graphTitle"></h2>
-    <canvas id="graphCanvas"></canvas>
+<!-- PLANT LIST MODAL -->
+<div id="plantModal" class="modal">
+  <div class="modal-content" style="max-width: 800px;">
+    <h3 style="display: flex; justify-content: space-between;">
+      List of Registered Plants 
+      <span style="cursor:pointer" onclick="closePlantModal()">✖</span>
+    </h3>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Plot ID</th>
+            <th>Plant Name</th>
+            <th>Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="plantTableBody">
+          <!-- Diri mugawas ang mga tanom gikan sa Firebase -->
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<!-- REPORT MODAL -->
-<div class="modal" id="reportModal">
-  <div class="modal-content">
-    <span class="close" onclick="closeReportModal()">✖</span>
-    <h2>Make Water Report</h2>
-    <label>Date:</label>
-    <input type="date" id="reportDate" onchange="updateTimeDropdown()">
-    <label>Time:</label>
-    <select id="reportTime" onchange="updateLiters()">
-      <option value="">Select time</option>
-    </select>
-    <label>Water Details (Liters):</label>
-    <input type="number" id="reportLiters" step="0.001" readonly>
-    <label>Remarks:</label>
-    <textarea id="reportRemarks" rows="3"></textarea>
-    <button onclick="saveReport()">Save Report</button>
-  </div>
-</div>
 
-<!-- VIEW REPORT MODAL -->
-<div class="modal" id="viewReportModal">
-  <div class="modal-content">
-    <span class="close" onclick="closeViewReportModal()">✖</span>
-    <h2>Water Reports</h2>
-    <button onclick="exportReportsToExcel()">Export to Excel</button>
-    <table id="reportTable">
-      <thead>
+
+
+  <!-- 2. YIELD DATA -->
+  <!-- 2. YIELD DATA -->
+<div class="card">
+  <h2>YIELD DATA 
+    <button class="btn btn-primary" onclick="showYieldGraph()" style="padding: 5px 10px;">📈 Graph</button>
+  </h2>
+  
+  <div class="form-grid">
+    <div class="field">
+      <label>Select Plant</label>
+    <select id="yieldPlantSelect" onchange="loadExistingYieldData()">
+  <option value="">-- Choose Plant --</option>
+  <!-- Ma-populate ni gikan sa Firebase -->
+</select>
+    </div>
+    <div class="field">
+      <label>Harvest/Log Date</label>
+      <input type="date" id="yieldDate" onchange="loadExistingYieldData()">
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table id="yieldTable">
+      <thead><tr><th>Stage</th><th>Qty</th><th></th></tr></thead>
+      <tbody>
         <tr>
-          <th>Date</th>
-          <th>Time</th>
-          <th>Liters</th>
-          <th>Remarks</th>
+          <td>
+            <select class="growthStage">
+              <option>Sowing</option><option>Germination</option><option>Vegetative</option>
+              <option>Budding</option><option>Flowering</option><option>Heading</option>
+              <option>Ripening</option><option>Harvest-Ready</option>
+              <option>Senescence (Dying)</option><option>Necrosis (Disease)</option>
+            </select>
+          </td>
+          <td><input type="number" class="qtyInput" value="0"></td>
+          <td></td>
         </tr>
-      </thead>
-      <tbody></tbody>
+      </tbody>
     </table>
   </div>
+  <div style="display: flex; gap: 10px; margin-top: 10px;">
+    <button class="btn btn-add" style="background:#34495e;" onclick="addRow()">+ Add Row</button>
+    <button class="btn btn-add" onclick="saveYieldToDB()">💾 Save Yield Data</button>
+  </div>
 </div>
+
+  <!-- 3. SENSOR DATA WITH RANGE -->
+<!-- 3. SENSOR DATA WITH RANGE -->
+<div class="card">
+  <h2>SENSOR LOGS</h2>
+  
+  <div class="range-filter">
+    <div class="range-inputs">
+      <div><label>From:</label><input type="date" id="dateFrom"></div>
+      <div><label>To:</label><input type="date" id="dateTo"></div>
+    </div>
+    <!-- Kani nga button ang mo-trigger sa toggle/filter -->
+    <button id="filterBtn" class="btn btn-primary" style="width: 100%;" onclick="toggleSensorData()">Filter Data</button>
+  </div>
+
+  <!-- Buttons para sa Graphs -->
+  <div style="display: flex; gap: 10px; margin-top: 10px;">
+    <button class="btn" onclick="showSensorGraph('soil')" style="flex: 1; background: #5dade2; color: white;">📈 Soil Graph</button>
+    <button class="btn" onclick="showSensorGraph('water')" style="flex: 1; background: #48c9b0; color: white;">📈 Water Graph</button>
+  </div>
+
+  <!-- SOIL MOISTURE MODAL -->
+  <div id="soilGraphModal" class="modal">
+    <div class="modal-content">
+      <h3>Soil Moisture Trend <span onclick="closeSensorModal('soil')" style="cursor:pointer">✖</span></h3>
+      <canvas id="soilChart"></canvas>
+    </div>
+  </div>
+
+  <!-- WATER FLOW MODAL -->
+  <div id="waterGraphModal" class="modal">
+    <div class="modal-content">
+      <h3>Water Flow Trend <span onclick="closeSensorModal('water')" style="cursor:pointer">✖</span></h3>
+      <canvas id="waterChart"></canvas>
+    </div>
+  </div>
+
+  <!-- DIRI NAGSUGOD ANG AREA NGA MA-HIDE/SHOW -->
+  <div id="sensorDisplayArea" style="display: none; margin-top: 20px;">
+    <div class="sensor-grid">
+      <!-- Soil Moisture Table -->
+      <div>
+        <h3 style="border-bottom-color: #7fb3d5;">Soil Moisture</h3>
+        <div class="table-container">
+          <table id="soilTable">
+            <thead><tr><th>Date</th><th>Time</th><th>Level</th></tr></thead>
+            <tbody id="soilBody"><tr><td colspan="3" style="text-align:center">No data loaded</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Water Flow Table -->
+      <div>
+        <h3 style="border-bottom-color: #76d7c4;">Water Flow</h3>
+        <div class="table-container">
+          <table id="waterTable">
+            <thead><tr><th>Date</th><th>Time</th><th>Liters</th></tr></thead>
+            <tbody id="waterBody"><tr><td colspan="3" style="text-align:center">No data loaded</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- KATAPUSAN SA HIDE/SHOW AREA -->
+
+</div>
+
+<!-- 4. DAILY LOG -->
+<!-- 4. DAILY LOG -->
+<div class="card">
+  <h2>DAILY OBSERVATIONS</h2>
+  <textarea id="dailyComment" rows="3" placeholder="Write notes here..."></textarea>
+  <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+    <button class="btn btn-add" onclick="saveDailyNote()" style="margin-top: 0;">💾 Save Note</button>
+    <!-- View Button -->
+    <button class="btn" onclick="openNotesModal()" style="background: #34495e; color: white;">👁️ View All</button>
+    <!-- Indicator -->
+    <span id="saveIndicator" style="display: none; color: #27ae60; font-weight: bold; font-size: 14px;">✅ Saved!</span>
+  </div>
+</div>
+
+
+  <button class="btn btn-export" onclick="exportToExcel()">📥 Export to Excel</button>
+</div>
+
+<!-- Modal for Graph -->
+<div id="graphModal" class="modal">
+  <div class="modal-content">
+    <h3 style="margin-bottom: 15px;">Yield Distribution <span style="cursor:pointer" onclick="closeModal()">✖</span></h3>
+    <canvas id="yieldChart"></canvas>
+  </div>
+</div>
+
+
+
+
+<!-- EXPORT MODAL -->
+<div id="exportModal" class="modal">
+  <div class="modal-content" style="max-width: 90%; width: 800px; max-height: 80vh; overflow-y: auto;">
+    <h3 style="background: #e67e22; color: white; padding: 10px; border-radius: 8px 8px 0 0; margin-top: -20px; margin-left: -20px; margin-right: -20px;">
+      🚀 Export Data Report
+      <span style="cursor:pointer; float: right;" onclick="closeExportModal()">✖</span>
+    </h3>
+    
+    <div class="range-filter" style="margin-top: 15px;">
+      <div class="range-inputs">
+        <div><label>From:</label><input type="date" id="expFrom"></div>
+        <div><label>To:</label><input type="date" id="expTo"></div>
+      </div>
+      <div style="margin-top: 10px;">
+        <label>Select Plant:</label>
+        <select id="expPlantSelect">
+          <option value="all">-- All Registered Plants --</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="margin-top: 15px;" onclick="generatePreview()">🔍 Preview Report</button>
+    </div>
+
+    <div id="exportPreviewArea" style="margin-top: 20px; display: none;">
+      <h4>Report Summary</h4>
+      <div id="previewStats" style="font-size: 14px; margin-bottom: 10px; color: #555;"></div>
+      <button class="btn btn-export" onclick="downloadFinalExcel()">📥 Download Excel File</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- VIEW NOTES MODAL -->
+<div id="notesModal" class="modal">
+  <div class="modal-content" style="max-width: 700px;">
+    <h3 style="display: flex; justify-content: space-between;">
+      All Daily Observations 
+      <span style="cursor:pointer" onclick="closeNotesModal()">✖</span>
+    </h3>
+    <div class="table-container" style="max-height: 400px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Observation Note</th>
+          </tr>
+        </thead>
+        <tbody id="notesTableBody">
+          <!-- Diri mugawas ang mga notes gikan sa Firebase -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<div id="exportPreviewArea" style="margin-top: 20px; display: none;">
+    <h4>📊 Report Preview</h4>
+    
+    <h5>Yield Records</h5>
+    <div class="table-container" style="max-height: 150px;">
+        <table id="previewYieldTable">
+            <thead><tr><th>Date</th><th>Plant</th><th>Stage</th><th>Qty</th></tr></thead>
+            <tbody id="previewYieldBody"></tbody>
+        </table>
+    </div>
+
+    <h5>Daily Observations</h5>
+    <div class="table-container" style="max-height: 150px;">
+        <table id="previewNoteTable">
+            <thead><tr><th>Date</th><th>Note</th></tr></thead>
+            <tbody id="previewNoteBody"></tbody>
+        </table>
+    </div>
+
+    <!-- Kani ang puli sa karaan nga sensor table sa preview area -->
+<h5>Soil Moisture Logs</h5>
+<div class="table-container" style="max-height: 150px;">
+    <table id="previewSoilTable">
+        <thead><tr><th>Date</th><th>Time</th><th>Level</th></tr></thead>
+        <tbody id="previewSoilBody"></tbody>
+    </table>
+</div>
+
+<h5>Water Flow Logs</h5>
+<div class="table-container" style="max-height: 150px;">
+    <table id="previewWaterTable">
+        <thead><tr><th>Date</th><th>Time</th><th>Liters</th></tr></thead>
+        <tbody id="previewWaterBody"></tbody>
+    </table>
+</div>
+
+    <div id="previewStats" style="font-size: 14px; margin: 10px 0; color: #555; font-weight: bold;"></div>
+    <button class="btn btn-export" onclick="downloadFinalExcel()">📥 Download Excel File</button>
+</div>
+
+
 
 
 <script>
-  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyBDO8YDCXINdRQJ6-6YLugZcVD2JvP89Ao",
     authDomain: "wateryield-b790e.firebaseapp.com",
@@ -270,238 +359,481 @@
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-
-  const soilTable = document.querySelector("#soilTable tbody");
-  const waterTable = document.querySelector("#waterTable tbody");
-  const totalLitersSpan = document.getElementById("totalLiters");
-  const soilDate = document.getElementById("soilDate");
-  const waterDate = document.getElementById("waterDate");
-  const reportDate = document.getElementById("reportDate");
-  const reportTime = document.getElementById("reportTime");
-  const reportLiters = document.getElementById("reportLiters");
-
   const today = new Date().toISOString().split("T")[0];
-  soilDate.value = today;
-  waterDate.value = today;
-  reportDate.value = today;
+  document.getElementById('yieldDate').value = today;
+  document.getElementById('dateFrom').value = today;
+  document.getElementById('dateTo').value = today;
 
-  let chart;
-
-  // ------------------ Load Data ------------------
-  loadSoilData();
-  loadWaterData();
-
-  function loadSoilData() {
-    const date = soilDate.value;
-    soilTable.innerHTML = "";
-    db.ref("soilData/" + date).once("value", snap => {
-      if (!snap.exists()) {
-        soilTable.innerHTML = `<tr><td colspan="4">No data</td></tr>`;
-        return;
-      }
-      snap.forEach(t => {
-        const d = t.val();
-        soilTable.innerHTML += `<tr>
-          <td>${date}</td>
-          <td>${t.key}</td>
-          <td>${d.moistureStr}</td>
-          <td>${d.soilRaw}</td>
-        </tr>`;
-      });
-    });
+  // --- PLANT IDENTIFICATION FUNCTIONS ---
+  function savePlantData() {
+    const id = document.getElementById("blockID").value;
+    const name = document.getElementById("plantName").value;
+    const type = document.getElementById("plantType").value;
+    if (!id || !name) return alert("Butangi og ID ug Name!");
+    db.ref("plants/" + id).set({ name, type, lastUpdated: new Date().toLocaleString() })
+      .then(() => alert("Saved!"));
   }
 
-  function loadWaterData() {
-    const date = waterDate.value;
-    waterTable.innerHTML = "";
-    let total = 0;
-    db.ref("waterdata/" + date).once("value", snap => {
-      if (!snap.exists()) {
-        waterTable.innerHTML = `<tr><td colspan="3">No data</td></tr>`;
-        totalLitersSpan.textContent = "0.000";
-        return;
-      }
-      snap.forEach(t => {
-        const d = t.val();
-        total += Number(d.liters);
-        waterTable.innerHTML += `<tr>
-          <td>${date}</td>
-          <td>${t.key}</td>
-          <td>${Number(d.liters).toFixed(3)}</td>
-        </tr>`;
+  function openPlantModal() {
+    document.getElementById("plantModal").style.display = "flex";
+    db.ref("plants").on("value", snap => {
+      let rows = "";
+      snap.forEach(child => {
+        const d = child.val();
+        rows += `<tr><td>${child.key}</td><td>${d.name}</td><td>${d.type}</td>
+          <td><button onclick="editPlant('${child.key}','${d.name}','${d.type}')">Edit</button>
+          <button onclick="deletePlant('${child.key}')">Del</button></td></tr>`;
       });
-      totalLitersSpan.textContent = total.toFixed(3);
+      document.getElementById("plantTableBody").innerHTML = rows;
     });
   }
-
-  // ------------------ Graph Functions ------------------
-  function showSoilGraph() {
-    const date = soilDate.value;
-    const labels = [], data = [];
-    db.ref("soilData/" + date).once("value", snap => {
-      if (!snap.exists()) return;
-      snap.forEach(t => {
-        labels.push(t.key);
-        const moistureValue = parseFloat((t.val().moistureStr || "0%").replace("%",""));
-        data.push(moistureValue);
-      });
-      openModal("Soil Moisture (%)", labels, data, "Moisture (%)");
-    });
+  function closePlantModal() { document.getElementById("plantModal").style.display = "none"; }
+  function deletePlant(id) { if(confirm("Delete?")) db.ref("plants/"+id).remove(); }
+  function editPlant(id, n, t) { 
+    document.getElementById("blockID").value = id; 
+    document.getElementById("plantName").value = n; 
+    document.getElementById("plantType").value = t; 
+    closePlantModal(); 
   }
 
-  function showWaterGraph() {
-    const date = waterDate.value;
-    const labels = [], data = [];
-    db.ref("waterdata/" + date).once("value", snap => {
-      snap.forEach(t => {
-        labels.push(t.key);
-        data.push(Number(t.val().liters));
-      });
-      openModal("Water Usage Graph", labels, data, "Liters");
-    });
+  // --- YIELD DATA FUNCTIONS ---
+// --- YIELD DATA FUNCTIONS ---
+// Kini nga function maminaw sa "plants" nga database (Real-time)
+db.ref("plants").on("value", (snap) => {
+  const select = document.getElementById("yieldPlantSelect");
+  
+  // I-reset ang sulod sa dropdown
+  select.innerHTML = '<option value="">-- Choose Plant --</option>';
+  
+  // I-loop tanang data sa database ug ibutang sa dropdown
+  snap.forEach((child) => {
+    const plotID = child.key;
+    const plantName = child.val().name;
+    
+    // I-add ang option sa select dropdown (Example: "Kamatis (Plot 1)")
+    select.innerHTML += `<option value="${plotID}">${plantName} (Plot ${plotID})</option>`;
+  });
+});
+
+  function addRow() {
+    const row = document.querySelector("#yieldTable tbody").insertRow();
+    row.innerHTML = `<td><select class="growthStage"><option>Sowing</option><option>Germination</option><option>Vegetative</option><option>Budding</option><option>Flowering</option><option>Heading</option><option>Ripening</option><option>Harvest-Ready</option><option>Senescence (Dying)</option><option>Necrosis (Disease)</option></select></td><td><input type="number" class="qtyInput" value="0"></td><td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
   }
 
-  function openModal(title, labels, data, label) {
-    document.getElementById("graphTitle").textContent = title;
+  function saveYieldToDB() {
+    const plantID = document.getElementById("yieldPlantSelect").value;
+    const date = document.getElementById("yieldDate").value;
+    if(!plantID || !date) return alert("Select Plant and Date!");
+    const data = {};
+    document.querySelectorAll("#yieldTable tbody tr").forEach((tr, i) => {
+      data["entry_"+i] = { stage: tr.querySelector(".growthStage").value, qty: parseInt(tr.querySelector(".qtyInput").value) };
+    });
+    db.ref(`yieldLogs/${plantID}/${date}`).set(data).then(() => alert("Yield Saved!"));
+  }
+
+  let myChart = null;
+  async function showYieldGraph() {
+    const plantID = document.getElementById("yieldPlantSelect").value;
+    const date = document.getElementById("yieldDate").value;
+    const pName = document.getElementById("yieldPlantSelect").options[document.getElementById("yieldPlantSelect").selectedIndex].text;
+    if(!plantID) return alert("Pilia ang tanom!");
+    const snap = await db.ref(`yieldLogs/${plantID}/${date}`).once("value");
+    if(!snap.exists()) return alert("No data for this date!");
+    const labels = [], values = [];
+    snap.forEach(c => { labels.push(c.val().stage); values.push(c.val().qty); });
     document.getElementById("graphModal").style.display = "flex";
-    if (chart) chart.destroy();
-    chart = new Chart(graphCanvas, {
-      type: "line",
-      data: { labels, datasets: [{ label, data, borderColor:"#3498db", fill:false }] }
-    });
+    const ctx = document.getElementById('yieldChart').getContext('2d');
+    if(myChart) myChart.destroy();
+    myChart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Qty for ' + pName, data: values, backgroundColor: '#27ae60' }] } });
   }
   function closeModal() { document.getElementById("graphModal").style.display = "none"; }
 
-  // ------------------ Report Modals ------------------
-  function openReportModal() {
-    document.getElementById("reportModal").style.display = "flex";
-    updateTimeDropdown(); // populate time dropdown
-  }
-  function closeReportModal() { document.getElementById("reportModal").style.display = "none"; }
-  function openViewReportModal() { 
-    document.getElementById("viewReportModal").style.display = "flex"; 
-    loadReports();
-  }
-  function closeViewReportModal() { document.getElementById("viewReportModal").style.display = "none"; }
-
-  // ------------------ Update Time Dropdown ------------------
-function updateTimeDropdown() {
-  const date = reportDate.value;
-  reportTime.innerHTML = `<option value="">Select time</option>`;
-  reportLiters.value = "";
-
-  if (!date) return;
-
-  db.ref("waterdata/" + date).once("value", snap=>{
-    if(!snap.exists()){
-      reportTime.innerHTML = `<option value="">No data available</option>`;
-      return;
-    }
-    snap.forEach(t=>{
-      const time = t.key;
-      reportTime.innerHTML += `<option value="${time}">${time}</option>`;
-    });
-  });
-}
-
-  // ------------------ Save Report ------------------
-  function saveReport() {
-    const date = reportDate.value;
-    const time = reportTime.value;
-    const liters = parseFloat(reportLiters.value);
-    const remarks = document.getElementById("reportRemarks").value;
-
-    if(!date || !time || isNaN(liters)){
-      alert("Please fill all required fields!");
-      return;
-    }
-
-    db.ref("waterReports/"+date+"/"+time).set({liters, remarks}, err=>{
-      if(err) alert("Error saving report: "+err);
-      else {
-        alert("Report saved!");
-        reportLiters.value="";
-        document.getElementById("reportRemarks").value="";
-        closeReportModal();
-      }
-    });
-  }
-
-  // ------------------ Load Reports ------------------
-  function loadReports() {
-    const tbody = document.querySelector("#reportTable tbody");
-    tbody.innerHTML = "";
-    db.ref("waterReports").once("value", snap=>{
-      if(!snap.exists()){ tbody.innerHTML=`<tr><td colspan="4">No reports</td></tr>`; return; }
-      snap.forEach(dateSnap=>{
-        const date = dateSnap.key;
-        dateSnap.forEach(timeSnap=>{
-          const time = timeSnap.key;
-          const d = timeSnap.val();
-          tbody.innerHTML += `<tr>
-            <td>${date}</td>
-            <td>${time}</td>
-            <td>${Number(d.liters).toFixed(3)}</td>
-            <td>${d.remarks || ""}</td>
-          </tr>`;
+  // --- SENSOR & EXPORT ---
+// --- SENSOR & EXPORT ---
+  async function loadSensorRange() {
+    const from = document.getElementById('dateFrom').value, to = document.getElementById('dateTo').value;
+    let sRows = "", wRows = "", cur = new Date(from), end = new Date(to);
+    
+    while(cur <= end) {
+      const dStr = cur.toISOString().split('T')[0];
+      
+      // SOIL DATA
+      const sS = await db.ref("soilData/"+dStr).once("value");
+      if(sS.exists()) {
+        sS.forEach(t => {  // <-- Gibutangan nato og { }
+          sRows += `<tr><td>${dStr}</td><td>${t.key}</td><td>${t.val().moistureStr}</td></tr>`;
         });
-      });
-    });
+      }
+      
+      // WATER DATA
+      const wS = await db.ref("waterdata/"+dStr).once("value");
+      if(wS.exists()) {
+        wS.forEach(t => {  // <-- Gibutangan nato og { }
+          wRows += `<tr><td>${dStr}</td><td>${t.key}</td><td>${parseFloat(t.val().liters).toFixed(3)} L</td></tr>`;
+        });
+      }
+      
+      cur.setDate(cur.getDate()+1);
+    }
+    
+    document.getElementById("soilBody").innerHTML = sRows || "<tr><td colspan='3' style='text-align:center'>No data</td></tr>";
+    document.getElementById("waterBody").innerHTML = wRows || "<tr><td colspan='3' style='text-align:center'>No data</td></tr>";
   }
 
+  function exportToExcel() {
+    const rows = [["Plot ID", "Plant", "Stage", "Qty", "Date"]];
+    const pID = document.getElementById("yieldPlantSelect").value;
+    const d = document.getElementById("yieldDate").value;
+    document.querySelectorAll("#yieldTable tbody tr").forEach(tr => {
+      rows.push([pID, "Plant", tr.querySelector(".growthStage").value, tr.querySelector(".qtyInput").value, d]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows), wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "FarmReport");
+    XLSX.writeFile(wb, `Report_${today}.xlsx`);
+  }
+  
 
-  function updateLiters() {
-  const date = reportDate.value;
-  const time = reportTime.value;
-  if (!date || !time) {
-    reportLiters.value = "";
+  let sensorCharts = { soil: null, water: null };
+
+async function showSensorGraph(type) {
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  
+  if (!from || !to) return alert("Select Date Range");
+
+  let labels = [];
+  let dataPoints = [];
+  let cur = new Date(from);
+  const end = new Date(to);
+
+  // Pakitaon ang modal
+  document.getElementById(type + "GraphModal").style.display = "flex";
+
+  // Pag-collect sa data base sa range
+  while (cur <= end) {
+    const dStr = cur.toISOString().split('T')[0];
+    const path = type === 'soil' ? "soilData/" + dStr : "waterdata/" + dStr;
+    const snap = await db.ref(path).once("value");
+
+    if (snap.exists()) {
+      snap.forEach(t => {
+        labels.push(`${dStr} ${t.key}`); // Date + Time
+        const val = type === 'soil' 
+          ? parseInt(t.val().moistureStr) || 0 
+          : parseFloat(t.val().liters) || 0;
+        dataPoints.push(val);
+      });
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  if (labels.length === 0) {
+    alert("Walay data nga makita sa maong range.");
+    closeSensorModal(type);
     return;
   }
 
-  db.ref("waterdata/" + date + "/" + time).once("value", snap => {
-    if (snap.exists()) {
-      reportLiters.value = Number(snap.val().liters).toFixed(3);
-    } else {
-      reportLiters.value = "";
+  const ctx = document.getElementById(type + 'Chart').getContext('2d');
+  
+  // I-destroy ang karaan nga chart kung naa man
+  if (sensorCharts[type]) sensorCharts[type].destroy();
+
+  sensorCharts[type] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: type === 'soil' ? 'Moisture Level (%)' : 'Water Liters (L)',
+        data: dataPoints,
+        borderColor: type === 'soil' ? '#3498db' : '#1abc9c',
+        backgroundColor: type === 'soil' ? 'rgba(52, 152, 219, 0.2)' : 'rgba(26, 188, 156, 0.2)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { display: true, title: { display: true, text: 'Date & Time' } },
+        y: { beginAtZero: true }
+      }
     }
   });
 }
 
-function exportReportsToExcel() {
-  const table = document.getElementById("reportTable");
-  let csv = [];
+function closeSensorModal(type) {
+  document.getElementById(type + "GraphModal").style.display = "none";
+}
+
+async function toggleSensorData() {
+  const btn = document.getElementById("filterBtn");
+  const displayArea = document.getElementById("sensorDisplayArea");
+
+  // Kung ang text sa button kay "Hide Data", i-hide nato ang area
+  if (btn.innerText === "Hide Data") {
+    displayArea.style.display = "none";
+    btn.innerText = "Filter Data";
+    btn.style.background = ""; // Balik sa original color
+    return;
+  }
+
+  // Kung mag Filter/Show data (Loading process)
+  btn.innerText = "Loading...";
   
-  // Get headers
-  const headers = [];
-  table.querySelectorAll("thead th").forEach(th => headers.push(th.innerText));
-  csv.push(headers.join(","));
+  // Tawgon ang imong function sa pagkarga sa data (siguruha nga naa na ang data)
+  await loadSensorRange(); 
 
-  // Get table rows
-  table.querySelectorAll("tbody tr").forEach(tr => {
-    const row = [];
-    tr.querySelectorAll("td").forEach(td => {
-      // Escape commas and quotes
-      let cell = td.innerText.replace(/"/g, '""');
-      if (cell.indexOf(',') > -1) cell = `"${cell}"`;
-      row.push(cell);
+  // Human og karga, ipakita ang area ug usbon ang button
+  displayArea.style.display = "block";
+  btn.innerText = "Hide Data";
+  btn.style.background = "#e74c3c"; // Himoon natong pula ang button para "Hide"
+}
+
+// Siguruha nga ang loadSensorRange() function nimo kay mag-return og Promise (async)
+// I-update lang ang tumoy sa loadSensorRange() aron dili kini automatic mag-load sa start
+
+// --- DAILY OBSERVATION FUNCTIONS ---
+
+// --- IMPROVED SAVE NOTE WITH INDICATOR ---
+async function saveDailyNote() {
+    const date = document.getElementById("yieldDate").value; // Nag-base sa Yield Date input
+    const newNote = document.getElementById("dailyComment").value;
+    const indicator = document.getElementById("saveIndicator");
+
+    if (!newNote) return alert("Add Note!");
+
+    const noteRef = db.ref(`dailyLogs/${date}`);
+    
+    try {
+        // I-save ang note
+        await noteRef.set({ note: newNote });
+
+        // I-pakita ang "Saved!" indicator
+        indicator.style.display = "inline";
+        
+        // I-hide ang indicator human ang 3 ka segundo
+        setTimeout(() => {
+            indicator.style.display = "none";
+        }, 3000);
+
+    } catch (error) {
+        console.error("Error saving note:", error);
+        alert("Failed to save note.");
+    }
+}
+
+// --- VIEW NOTES MODAL FUNCTIONS ---
+function openNotesModal() {
+    document.getElementById("notesModal").style.display = "flex";
+    
+    // Kuhaon tanang notes gikan sa Firebase
+    db.ref("dailyLogs").on("value", (snap) => {
+        let rows = "";
+        if (snap.exists()) {
+            // I-loop ang mga dates (keys)
+            snap.forEach((child) => {
+                const date = child.key;
+                const data = child.val();
+                rows += `
+                    <tr>
+                        <td style="white-space: nowrap; font-weight: bold;">${date}</td>
+                        <td style="white-space: pre-wrap;">${data.note}</td>
+                    </tr>`;
+            });
+            document.getElementById("notesTableBody").innerHTML = rows;
+        } else {
+            document.getElementById("notesTableBody").innerHTML = "<tr><td colspan='2' style='text-align:center'>No observations found.</td></tr>";
+        }
     });
-    csv.push(row.join(","));
-  });
+}
 
-  // Create download link
-  const csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
-  const downloadLink = document.createElement("a");
-  downloadLink.download = `WaterReports_${new Date().toISOString().slice(0,10)}.csv`;
-  downloadLink.href = window.URL.createObjectURL(csvFile);
-  downloadLink.style.display = "none";
-  document.body.appendChild(downloadLink);
-  downloadLink.click();
-  document.body.removeChild(downloadLink);
+function closeNotesModal() {
+    document.getElementById("notesModal").style.display = "none";
+}
+
+// Function para ma-populate ang plant list sa Export Modal
+function openExportModal() {
+  document.getElementById("exportModal").style.display = "flex";
+  document.getElementById("expFrom").value = today;
+  document.getElementById("expTo").value = today;
+  
+  // Kopyahon ang options gikan sa main yield dropdown ngadto sa export dropdown
+  const mainSelect = document.getElementById("yieldPlantSelect");
+  const expSelect = document.getElementById("expPlantSelect");
+  expSelect.innerHTML = '<option value="all">-- All Registered Plants --</option>';
+  Array.from(mainSelect.options).forEach(opt => {
+    if(opt.value) expSelect.innerHTML += `<option value="${opt.value}">${opt.text}</option>`;
+  });
+}
+async function generatePreview() {
+    const from = document.getElementById("expFrom").value;
+    const to = document.getElementById("expTo").value;
+    const targetPlant = document.getElementById("expPlantSelect").value;
+
+    if (!from || !to) return alert("Add note !");
+
+    // Limpyohan ang tanang preview tables
+    document.getElementById("previewYieldBody").innerHTML = "";
+    document.getElementById("previewNoteBody").innerHTML = "";
+    document.getElementById("previewSoilBody").innerHTML = ""; // Clear Soil
+    document.getElementById("previewWaterBody").innerHTML = ""; // Clear Water
+
+    let yieldCount = 0, soilCount = 0, waterCount = 0, noteCount = 0;
+    let cur = new Date(from);
+    const end = new Date(to);
+
+    while (cur <= end) {
+        const dStr = cur.toISOString().split('T')[0];
+
+        // --- A. OBSERVATIONS ---
+        const noteSnap = await db.ref(`dailyLogs/${dStr}`).once("value");
+        if (noteSnap.exists()) {
+            noteCount++;
+            document.getElementById("previewNoteBody").innerHTML += `<tr><td>${dStr}</td><td>${noteSnap.val().note}</td></tr>`;
+        }
+
+        // --- B. YIELD LOGS ---
+        const yieldSnap = await db.ref("yieldLogs").once("value");
+        const plantsSnap = await db.ref("plants").once("value");
+        if (yieldSnap.exists()) {
+            yieldSnap.forEach(plantNode => {
+                const pID = plantNode.key;
+                if (targetPlant !== "all" && targetPlant !== pID) return;
+                const dayData = plantNode.child(dStr);
+                if (dayData.exists()) {
+                    const plantInfo = plantsSnap.child(pID).val();
+                    const displayName = plantInfo ? plantInfo.name : "Unknown";
+                    dayData.forEach(entry => {
+                        yieldCount++;
+                        document.getElementById("previewYieldBody").innerHTML += `<tr><td>${dStr}</td><td>${displayName}</td><td>${entry.val().stage}</td><td>${entry.val().qty}</td></tr>`;
+                    });
+                }
+            });
+        }
+
+        // --- C. SOIL DATA (SEPARATE TABLE) ---
+        const soilSnap = await db.ref(`soilData/${dStr}`).once("value");
+        if (soilSnap.exists()) {
+            soilSnap.forEach(s => {
+                soilCount++;
+                document.getElementById("previewSoilBody").innerHTML += `<tr><td>${dStr}</td><td>${s.key}</td><td>${s.val().moistureStr || "0%"}</td></tr>`;
+            });
+        }
+
+        // --- D. WATER DATA (SEPARATE TABLE) ---
+        const waterSnap = await db.ref(`waterdata/${dStr}`).once("value");
+        if (waterSnap.exists()) {
+            waterSnap.forEach(w => {
+                waterCount++;
+                document.getElementById("previewWaterBody").innerHTML += `<tr><td>${dStr}</td><td>${w.key}</td><td>${parseFloat(w.val().liters).toFixed(3)} L</td></tr>`;
+            });
+        }
+
+        cur.setDate(cur.getDate() + 1);
+    }
+
+    // Pakitaon ang preview kung naay data
+    if (yieldCount + soilCount + waterCount + noteCount === 0) {
+        alert("Walay data!");
+        document.getElementById("exportPreviewArea").style.display = "none";
+    } else {
+        document.getElementById("previewStats").innerText = `Found: ${yieldCount} Yields, ${noteCount} Notes, ${soilCount} Soil logs, ${waterCount} Water logs.`;
+        document.getElementById("exportPreviewArea").style.display = "block";
+    }
+}
+
+function downloadFinalExcel() {
+    const wb = XLSX.utils.book_new();
+
+    // Kuhaon ang tagsa-tagsa ka table
+    const wsYield = XLSX.utils.table_to_sheet(document.getElementById("previewYieldTable"));
+    const wsNotes = XLSX.utils.table_to_sheet(document.getElementById("previewNoteTable"));
+    const wsSoil = XLSX.utils.table_to_sheet(document.getElementById("previewSoilTable"));
+    const wsWater = XLSX.utils.table_to_sheet(document.getElementById("previewWaterTable"));
+
+    // I-butang sa Excel tabs
+    XLSX.utils.book_append_sheet(wb, wsYield, "Yield Data");
+    XLSX.utils.book_append_sheet(wb, wsNotes, "Observations");
+    XLSX.utils.book_append_sheet(wb, wsSoil, "Soil Moisture Logs");
+    XLSX.utils.book_append_sheet(wb, wsWater, "Water Flow Logs");
+
+    const from = document.getElementById("expFrom").value;
+    const to = document.getElementById("expTo").value;
+    XLSX.writeFile(wb, `Farm_Report_${from}_to_${to}.xlsx`);
+}
+async function loadExistingYieldData() {
+    const plantID = document.getElementById("yieldPlantSelect").value;
+    const date = document.getElementById("yieldDate").value;
+    const tableBody = document.querySelector("#yieldTable tbody");
+
+    // Limpyohan ang table body sa dili pa mag-load og bag-o
+    tableBody.innerHTML = "";
+
+    if (!plantID || !date) {
+        // Kung walay napili, butangan lang og usa ka empty row para input
+        addRow(); 
+        return;
+    }
+
+    // Kuhaon ang data gikan sa Firebase: yieldLogs/{plantID}/{date}
+    const snap = await db.ref(`yieldLogs/${plantID}/${date}`).once("value");
+
+    if (snap.exists()) {
+        // Kung naay data, i-loop kini ug i-display sa table
+        snap.forEach(child => {
+            const entry = child.val();
+            const row = tableBody.insertRow();
+            row.innerHTML = `
+                <td>
+                    <select class="growthStage">
+                        <option ${entry.stage === 'Sowing' ? 'selected' : ''}>Sowing</option>
+                        <option ${entry.stage === 'Germination' ? 'selected' : ''}>Germination</option>
+                        <option ${entry.stage === 'Vegetative' ? 'selected' : ''}>Vegetative</option>
+                        <option ${entry.stage === 'Budding' ? 'selected' : ''}>Budding</option>
+                        <option ${entry.stage === 'Flowering' ? 'selected' : ''}>Flowering</option>
+                        <option ${entry.stage === 'Heading' ? 'selected' : ''}>Heading</option>
+                        <option ${entry.stage === 'Ripening' ? 'selected' : ''}>Ripening</option>
+                        <option ${entry.stage === 'Harvest-Ready' ? 'selected' : ''}>Harvest-Ready</option>
+                        <option ${entry.stage === 'Senescence (Dying)' ? 'selected' : ''}>Senescence (Dying)</option>
+                        <option ${entry.stage === 'Necrosis (Disease)' ? 'selected' : ''}>Necrosis (Disease)</option>
+                    </select>
+                </td>
+                <td><input type="number" class="qtyInput" value="${entry.qty}"></td>
+                <td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>
+            `;
+        });
+        console.log("Data loaded for " + plantID + " on " + date);
+    } else {
+        // Kung walay data nga nakit-an, butangan og usa ka blanko nga row
+        addRow();
+    }
+    
+    // I-load sab ang daily note para ani nga petsa
+    loadDailyNote(date);
+}
+
+// I-update ang original button function
+function exportToExcel() {
+  openExportModal();
 }
 
 
 
+function closeExportModal() {
+    // I-hide ang tibuok modal
+    document.getElementById("exportModal").style.display = "none";
+    
+    // Opsyonal: I-reset ang preview area para limpyo inig abli nimo og balik
+    document.getElementById("exportPreviewArea").style.display = "none";
+} 
+// I-load ang note para sa petsa karon inig sugod sa page
+loadDailyNote(today);
 
+
+
+
+  loadSensorRange();
 </script>
+
 </body>
 </html>
