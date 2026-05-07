@@ -124,13 +124,11 @@
 </div>
 
 
-
-
   <!-- 2. YIELD DATA -->
   <!-- 2. YIELD DATA -->
 <div class="card">
   <h2>YIELD DATA 
-    <button class="btn btn-primary" onclick="showYieldGraph()" style="padding: 5px 10px;">📈 Graph</button>
+ 
   </h2>
   
   <div class="form-grid">
@@ -149,7 +147,12 @@
 
   <div class="table-container">
     <table id="yieldTable">
-      <thead id="yieldTableHead"><tr><th>Stage</th><th>Qty</th><th></th></tr></thead>
+      <thead id="yieldTableHead">
+  <tr>
+    <th>Stage</th>
+    <th></th>
+  </tr>
+</thead>
       <tbody>
         <tr>
           <td>
@@ -167,8 +170,8 @@
     </table>
   </div>
   <div style="display: flex; gap: 10px; margin-top: 10px;">
-    <button class="btn btn-add" style="background:#34495e;" onclick="addRow()">+ Add Row</button>
-    <button class="btn btn-add" style="background:#9b59b6;" onclick="openAddColumnModal()">+ Add Column</button>
+    <button class="btn btn-add" style="background:#34495e;" onclick="addRow()">+ Add More Growth Stages</button>
+    <button class="btn btn-add" style="background:#9b59b6;" onclick="openAddColumnModal()">+ Add Properties</button>
     <button class="btn btn-add" onclick="saveYieldToDB()">💾 Save Yield Data</button>
   </div>
 
@@ -435,49 +438,48 @@ db.ref("plants").on("value", (snap) => {
   });
 });
 
-  function addRow() {
-    const row = document.querySelector("#yieldTable tbody").insertRow();
-    let html = `<td><select class="growthStage"><option>Sowing</option><option>Germination</option><option>Vegetative</option><option>Budding</option><option>Flowering</option><option>Heading</option><option>Ripening</option><option>Harvest-Ready</option><option>Senescence (Dying)</option><option>Necrosis (Disease)</option></select></td><td><input type="number" class="qtyInput" value="0"></td>`;
-    
-    // Add cells for custom columns
-    const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
-    customColumns.forEach(() => {
-      html += `<td><input type="text" class="customColumnInput" value=""></td>`;
-    });
-    
-    html += `<td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
-    row.innerHTML = html;
-  }
+function addRow() {
+  const row = document.querySelector("#yieldTable tbody").insertRow();
+  // Removed the Qty <td> input
+  let html = `<td><select class="growthStage"><option>Sowing</option><option>Germination</option><option>Vegetative</option><option>Budding</option><option>Flowering</option><option>Heading</option><option>Ripening</option><option>Harvest-Ready</option><option>Senescence (Dying)</option><option>Necrosis (Disease)</option></select></td>`;
+  
+  // Add cells for custom columns
+  const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
+  customColumns.forEach(() => {
+    html += `<td><input type="text" class="customColumnInput" value=""></td>`;
+  });
+  
+  html += `<td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
+  row.innerHTML = html;
+}
 
-  function saveYieldToDB() {
-    const plantID = document.getElementById("yieldPlantSelect").value;
-    const date = document.getElementById("yieldDate").value;
-    if(!plantID || !date) return alert("Select Plant and Date!");
+function saveYieldToDB() {
+  const plantID = document.getElementById("yieldPlantSelect").value;
+  const date = document.getElementById("yieldDate").value;
+  if(!plantID || !date) return alert("Select Plant and Date!");
+  
+  const data = {};
+  const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
+  
+  document.querySelectorAll("#yieldTable tbody tr").forEach((tr, i) => {
+    const rowData = { 
+      stage: tr.querySelector(".growthStage").value 
+      // qty is no longer included here
+    };
     
-    const data = {};
-    const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
-    
-    document.querySelectorAll("#yieldTable tbody tr").forEach((tr, i) => {
-      const rowData = { 
-        stage: tr.querySelector(".growthStage").value, 
-        qty: parseInt(tr.querySelector(".qtyInput").value) 
-      };
-      
-      // Add custom column values using the span text
-      const customInputs = tr.querySelectorAll(".customColumnInput");
-      customInputs.forEach((input, idx) => {
-        const colName = customColumns[idx]?.querySelector("span")?.textContent || `col_${idx}`;
-        rowData[colName] = input.value;
-      });
-      
-      data["entry_"+i] = rowData;
+    const customInputs = tr.querySelectorAll(".customColumnInput");
+    customInputs.forEach((input, idx) => {
+      const colName = customColumns[idx]?.querySelector("span")?.textContent || `col_${idx}`;
+      rowData[colName] = input.value;
     });
     
-    // Save the data
-    db.ref(`yieldLogs/${plantID}/${date}`).set(data).then(() => {
-      alert("Yield Saved to Database!");
-    });
-  }
+    data["entry_"+i] = rowData;
+  });
+  
+  db.ref(`yieldLogs/${plantID}/${date}`).set(data).then(() => {
+    alert("Yield Saved to Database!");
+  });
+}
 
   let myChart = null;
   async function showYieldGraph() {
@@ -834,72 +836,57 @@ function downloadFinalExcel() {
     XLSX.writeFile(wb, `Farm_Report_${from}_to_${to}.xlsx`);
 }
 async function loadExistingYieldData() {
-    const plantID = document.getElementById("yieldPlantSelect").value;
-    const date = document.getElementById("yieldDate").value;
-    const tableBody = document.querySelector("#yieldTable tbody");
+  const plantID = document.getElementById("yieldPlantSelect").value;
+  const date = document.getElementById("yieldDate").value;
+  const tableBody = document.querySelector("#yieldTable tbody");
 
-    // Clear textarea immediately when date changes
-    document.getElementById("dailyComment").value = "";
+  document.getElementById("dailyComment").value = "";
+  tableBody.innerHTML = "";
 
-    // Limpyohan ang table body sa dili pa mag-load og bag-o
-    tableBody.innerHTML = "";
-
-    if (!plantID || !date) {
-        // Kung walay napili, butangan lang og usa ka empty row para input
-        await loadColumnDefinitions();
-        addRow(); 
-        return;
-    }
-
-    // Load GLOBAL column definitions (for all plants)
+  if (!plantID || !date) {
     await loadColumnDefinitions();
+    addRow(); 
+    return;
+  }
 
-    // Kuhaon ang data gikan sa Firebase: yieldLogs/{plantID}/{date}
-    const snap = await db.ref(`yieldLogs/${plantID}/${date}`).once("value");
+  await loadColumnDefinitions();
+  const snap = await db.ref(`yieldLogs/${plantID}/${date}`).once("value");
 
-    if (snap.exists()) {
-        // Kung naay data, i-loop kini ug i-display sa table
-        snap.forEach(child => {
-            const entry = child.val();
-            const row = tableBody.insertRow();
-            let html = `
-                <td>
-                    <select class="growthStage">
-                        <option ${entry.stage === 'Sowing' ? 'selected' : ''}>Sowing</option>
-                        <option ${entry.stage === 'Germination' ? 'selected' : ''}>Germination</option>
-                        <option ${entry.stage === 'Vegetative' ? 'selected' : ''}>Vegetative</option>
-                        <option ${entry.stage === 'Budding' ? 'selected' : ''}>Budding</option>
-                        <option ${entry.stage === 'Flowering' ? 'selected' : ''}>Flowering</option>
-                        <option ${entry.stage === 'Heading' ? 'selected' : ''}>Heading</option>
-                        <option ${entry.stage === 'Ripening' ? 'selected' : ''}>Ripening</option>
-                        <option ${entry.stage === 'Harvest-Ready' ? 'selected' : ''}>Harvest-Ready</option>
-                        <option ${entry.stage === 'Senescence (Dying)' ? 'selected' : ''}>Senescence (Dying)</option>
-                        <option ${entry.stage === 'Necrosis (Disease)' ? 'selected' : ''}>Necrosis (Disease)</option>
-                    </select>
-                </td>
-                <td><input type="number" class="qtyInput" value="${entry.qty}"></td>
-            `;
-            
-            // Add custom column values
-            const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
-            customColumns.forEach(col => {
-              const colName = col.querySelector("span").textContent;
-              const colValue = entry[colName] || "";
-              html += `<td><input type="text" class="customColumnInput" value="${colValue}"></td>`;
-            });
-            
-            html += `<td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
-            row.innerHTML = html;
-        });
-        console.log("Data loaded for " + plantID + " on " + date);
-    } else {
-        // Kung walay data nga nakit-an, butangan og usa ka blanko nga row
-        addRow();
-    }
-    
-    
+  if (snap.exists()) {
+    snap.forEach(child => {
+      const entry = child.val();
+      const row = tableBody.insertRow();
+      let html = `
+          <td>
+              <select class="growthStage">
+                  <option ${entry.stage === 'Sowing' ? 'selected' : ''}>Sowing</option>
+                  <option ${entry.stage === 'Germination' ? 'selected' : ''}>Germination</option>
+                  <option ${entry.stage === 'Vegetative' ? 'selected' : ''}>Vegetative</option>
+                  <option ${entry.stage === 'Budding' ? 'selected' : ''}>Budding</option>
+                  <option ${entry.stage === 'Flowering' ? 'selected' : ''}>Flowering</option>
+                  <option ${entry.stage === 'Heading' ? 'selected' : ''}>Heading</option>
+                  <option ${entry.stage === 'Ripening' ? 'selected' : ''}>Ripening</option>
+                  <option ${entry.stage === 'Harvest-Ready' ? 'selected' : ''}>Harvest-Ready</option>
+                  <option ${entry.stage === 'Senescence (Dying)' ? 'selected' : ''}>Senescence (Dying)</option>
+                  <option ${entry.stage === 'Necrosis (Disease)' ? 'selected' : ''}>Necrosis (Disease)</option>
+              </select>
+          </td>
+      `; // Removed Qty input cell here
+      
+      const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
+      customColumns.forEach(col => {
+        const colName = col.querySelector("span").textContent;
+        const colValue = entry[colName] || "";
+        html += `<td><input type="text" class="customColumnInput" value="${colValue}"></td>`;
+      });
+      
+      html += `<td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
+      row.innerHTML = html;
+    });
+  } else {
+    addRow();
+  }
 }
-
 // I-update ang original button function
 function exportToExcel() {
   openExportModal();
