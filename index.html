@@ -105,6 +105,24 @@
   </div>
 </div>
 
+<!-- ADD COLUMN MODAL -->
+<div id="addColumnModal" class="modal">
+  <div class="modal-content" style="max-width: 400px;">
+    <h3 style="display: flex; justify-content: space-between;">
+      Add New Column
+      <span style="cursor:pointer" onclick="closeAddColumnModal()">✖</span>
+    </h3>
+    <div style="margin-top: 15px;">
+      <label>Column Name:</label>
+      <input type="text" id="columnNameInput" placeholder="e.g., Notes, Weather, Humidity" style="margin-bottom: 15px;">
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-primary" onclick="saveNewColumn()" style="flex: 1;">Add Column</button>
+        <button class="btn" onclick="closeAddColumnModal()" style="flex: 1; background: #95a5a6; color: white;">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 
 
@@ -131,7 +149,7 @@
 
   <div class="table-container">
     <table id="yieldTable">
-      <thead><tr><th>Stage</th><th>Qty</th><th></th></tr></thead>
+      <thead id="yieldTableHead"><tr><th>Stage</th><th>Qty</th><th></th></tr></thead>
       <tbody>
         <tr>
           <td>
@@ -150,8 +168,10 @@
   </div>
   <div style="display: flex; gap: 10px; margin-top: 10px;">
     <button class="btn btn-add" style="background:#34495e;" onclick="addRow()">+ Add Row</button>
+    <button class="btn btn-add" style="background:#9b59b6;" onclick="openAddColumnModal()">+ Add Column</button>
     <button class="btn btn-add" onclick="saveYieldToDB()">💾 Save Yield Data</button>
   </div>
+
 </div>
 
   <!-- 3. SENSOR DATA WITH RANGE -->
@@ -310,7 +330,7 @@
     <h5>Yield Records</h5>
     <div class="table-container" style="max-height: 150px;">
         <table id="previewYieldTable">
-            <thead><tr><th>Date</th><th>Plant</th><th>Stage</th><th>Qty</th></tr></thead>
+            <thead id="previewYieldHead"><tr><th>Date</th><th>Plant</th><th>Stage</th><th>Qty</th></tr></thead>
             <tbody id="previewYieldBody"></tbody>
         </table>
     </div>
@@ -359,7 +379,7 @@
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString('en-CA');
   document.getElementById('yieldDate').value = today;
   document.getElementById('dateFrom').value = today;
   document.getElementById('dateTo').value = today;
@@ -417,18 +437,46 @@ db.ref("plants").on("value", (snap) => {
 
   function addRow() {
     const row = document.querySelector("#yieldTable tbody").insertRow();
-    row.innerHTML = `<td><select class="growthStage"><option>Sowing</option><option>Germination</option><option>Vegetative</option><option>Budding</option><option>Flowering</option><option>Heading</option><option>Ripening</option><option>Harvest-Ready</option><option>Senescence (Dying)</option><option>Necrosis (Disease)</option></select></td><td><input type="number" class="qtyInput" value="0"></td><td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
+    let html = `<td><select class="growthStage"><option>Sowing</option><option>Germination</option><option>Vegetative</option><option>Budding</option><option>Flowering</option><option>Heading</option><option>Ripening</option><option>Harvest-Ready</option><option>Senescence (Dying)</option><option>Necrosis (Disease)</option></select></td><td><input type="number" class="qtyInput" value="0"></td>`;
+    
+    // Add cells for custom columns
+    const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
+    customColumns.forEach(() => {
+      html += `<td><input type="text" class="customColumnInput" value=""></td>`;
+    });
+    
+    html += `<td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
+    row.innerHTML = html;
   }
 
   function saveYieldToDB() {
     const plantID = document.getElementById("yieldPlantSelect").value;
     const date = document.getElementById("yieldDate").value;
     if(!plantID || !date) return alert("Select Plant and Date!");
+    
     const data = {};
+    const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
+    
     document.querySelectorAll("#yieldTable tbody tr").forEach((tr, i) => {
-      data["entry_"+i] = { stage: tr.querySelector(".growthStage").value, qty: parseInt(tr.querySelector(".qtyInput").value) };
+      const rowData = { 
+        stage: tr.querySelector(".growthStage").value, 
+        qty: parseInt(tr.querySelector(".qtyInput").value) 
+      };
+      
+      // Add custom column values using the span text
+      const customInputs = tr.querySelectorAll(".customColumnInput");
+      customInputs.forEach((input, idx) => {
+        const colName = customColumns[idx]?.querySelector("span")?.textContent || `col_${idx}`;
+        rowData[colName] = input.value;
+      });
+      
+      data["entry_"+i] = rowData;
     });
-    db.ref(`yieldLogs/${plantID}/${date}`).set(data).then(() => alert("Yield Saved!"));
+    
+    // Save the data
+    db.ref(`yieldLogs/${plantID}/${date}`).set(data).then(() => {
+      alert("Yield Saved to Database!");
+    });
   }
 
   let myChart = null;
@@ -450,12 +498,12 @@ db.ref("plants").on("value", (snap) => {
 
   // --- SENSOR & EXPORT ---
 // --- SENSOR & EXPORT ---
-  async function loadSensorRange() {
+async function loadSensorRange() {
     const from = document.getElementById('dateFrom').value, to = document.getElementById('dateTo').value;
     let sRows = "", wRows = "", cur = new Date(from), end = new Date(to);
     
     while(cur <= end) {
-      const dStr = cur.toISOString().split('T')[0];
+      const dStr = cur.toLocaleDateString('en-CA');
       
       // SOIL DATA
       const sS = await db.ref("soilData/"+dStr).once("value");
@@ -511,7 +559,7 @@ async function showSensorGraph(type) {
 
   // Pag-collect sa data base sa range
   while (cur <= end) {
-    const dStr = cur.toISOString().split('T')[0];
+    const dStr = cur.toLocaleDateString('en-CA');
     const path = type === 'soil' ? "soilData/" + dStr : "waterdata/" + dStr;
     const snap = await db.ref(path).once("value");
 
@@ -670,20 +718,34 @@ async function generatePreview() {
     const to = document.getElementById("expTo").value;
     const targetPlant = document.getElementById("expPlantSelect").value;
 
-    if (!from || !to) return alert("Add note !");
+    if (!from || !to) return alert("Select date range!");
+
+    // Load global columns
+    const colSnap = await db.ref("globalColumnDefinitions").once("value");
+    const globalCols = colSnap.exists() ? Object.keys(colSnap.val()) : [];
+    
+    // Update preview yield table headers with custom columns
+    const previewHead = document.getElementById("previewYieldHead");
+    const baseHeaders = '<tr><th>Date</th><th>Plant</th><th>Stage</th><th>Qty</th>';
+    let headerHtml = baseHeaders;
+    globalCols.forEach(col => {
+      headerHtml += `<th>${col}</th>`;
+    });
+    headerHtml += '</tr>';
+    previewHead.innerHTML = headerHtml;
 
     // Limpyohan ang tanang preview tables
     document.getElementById("previewYieldBody").innerHTML = "";
     document.getElementById("previewNoteBody").innerHTML = "";
-    document.getElementById("previewSoilBody").innerHTML = ""; // Clear Soil
-    document.getElementById("previewWaterBody").innerHTML = ""; // Clear Water
+    document.getElementById("previewSoilBody").innerHTML = "";
+    document.getElementById("previewWaterBody").innerHTML = "";
 
     let yieldCount = 0, soilCount = 0, waterCount = 0, noteCount = 0;
     let cur = new Date(from);
     const end = new Date(to);
 
     while (cur <= end) {
-        const dStr = cur.toISOString().split('T')[0];
+        const dStr = cur.toLocaleDateString('en-CA');
 
         // --- A. OBSERVATIONS ---
         const noteSnap = await db.ref(`dailyLogs/${dStr}`).once("value");
@@ -692,7 +754,7 @@ async function generatePreview() {
             document.getElementById("previewNoteBody").innerHTML += `<tr><td>${dStr}</td><td>${noteSnap.val().note}</td></tr>`;
         }
 
-        // --- B. YIELD LOGS ---
+        // --- B. YIELD LOGS WITH CUSTOM COLUMNS ---
         const yieldSnap = await db.ref("yieldLogs").once("value");
         const plantsSnap = await db.ref("plants").once("value");
         if (yieldSnap.exists()) {
@@ -705,7 +767,17 @@ async function generatePreview() {
                     const displayName = plantInfo ? plantInfo.name : "Unknown";
                     dayData.forEach(entry => {
                         yieldCount++;
-                        document.getElementById("previewYieldBody").innerHTML += `<tr><td>${dStr}</td><td>${displayName}</td><td>${entry.val().stage}</td><td>${entry.val().qty}</td></tr>`;
+                        const entryData = entry.val();
+                        let row = `<tr><td>${dStr}</td><td>${displayName}</td><td>${entryData.stage}</td><td>${entryData.qty}</td>`;
+                        
+                        // Add custom column values
+                        globalCols.forEach(col => {
+                          const colValue = entryData[col] || "";
+                          row += `<td>${colValue}</td>`;
+                        });
+                        
+                        row += '</tr>';
+                        document.getElementById("previewYieldBody").innerHTML += row;
                     });
                 }
             });
@@ -734,7 +806,7 @@ async function generatePreview() {
 
     // Pakitaon ang preview kung naay data
     if (yieldCount + soilCount + waterCount + noteCount === 0) {
-        alert("Walay data!");
+        alert("No data found!");
         document.getElementById("exportPreviewArea").style.display = "none";
     } else {
         document.getElementById("previewStats").innerText = `Found: ${yieldCount} Yields, ${noteCount} Notes, ${soilCount} Soil logs, ${waterCount} Water logs.`;
@@ -766,14 +838,21 @@ async function loadExistingYieldData() {
     const date = document.getElementById("yieldDate").value;
     const tableBody = document.querySelector("#yieldTable tbody");
 
+    // Clear textarea immediately when date changes
+    document.getElementById("dailyComment").value = "";
+
     // Limpyohan ang table body sa dili pa mag-load og bag-o
     tableBody.innerHTML = "";
 
     if (!plantID || !date) {
         // Kung walay napili, butangan lang og usa ka empty row para input
+        await loadColumnDefinitions();
         addRow(); 
         return;
     }
+
+    // Load GLOBAL column definitions (for all plants)
+    await loadColumnDefinitions();
 
     // Kuhaon ang data gikan sa Firebase: yieldLogs/{plantID}/{date}
     const snap = await db.ref(`yieldLogs/${plantID}/${date}`).once("value");
@@ -783,7 +862,7 @@ async function loadExistingYieldData() {
         snap.forEach(child => {
             const entry = child.val();
             const row = tableBody.insertRow();
-            row.innerHTML = `
+            let html = `
                 <td>
                     <select class="growthStage">
                         <option ${entry.stage === 'Sowing' ? 'selected' : ''}>Sowing</option>
@@ -799,8 +878,18 @@ async function loadExistingYieldData() {
                     </select>
                 </td>
                 <td><input type="number" class="qtyInput" value="${entry.qty}"></td>
-                <td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>
             `;
+            
+            // Add custom column values
+            const customColumns = document.querySelectorAll("#yieldTableHead th.customColumn");
+            customColumns.forEach(col => {
+              const colName = col.querySelector("span").textContent;
+              const colValue = entry[colName] || "";
+              html += `<td><input type="text" class="customColumnInput" value="${colValue}"></td>`;
+            });
+            
+            html += `<td onclick="this.parentElement.remove()" style="color:red; cursor:pointer">✖</td>`;
+            row.innerHTML = html;
         });
         console.log("Data loaded for " + plantID + " on " + date);
     } else {
@@ -808,8 +897,7 @@ async function loadExistingYieldData() {
         addRow();
     }
     
-    // I-load sab ang daily note para ani nga petsa
-    loadDailyNote(date);
+    
 }
 
 // I-update ang original button function
@@ -829,10 +917,119 @@ function closeExportModal() {
 // I-load ang note para sa petsa karon inig sugod sa page
 loadDailyNote(today);
 
+// --- ADD COLUMN FUNCTIONS ---
+function openAddColumnModal() {
+  document.getElementById("addColumnModal").style.display = "flex";
+  document.getElementById("columnNameInput").value = "";
+  document.getElementById("columnNameInput").focus();
+}
+
+function closeAddColumnModal() {
+  document.getElementById("addColumnModal").style.display = "none";
+}
+
+function saveNewColumn() {
+  const columnName = document.getElementById("columnNameInput").value.trim();
+  if (!columnName) return alert("Enter a column name!");
+  
+  // Save sa Firebase GLOBALLY una
+  db.ref(`globalColumnDefinitions/${columnName}`).set(true).then(() => {
+    // I-refresh ang table definitions para mugawas ang delete button
+    loadColumnDefinitions().then(() => {
+        // I-reload ang data para mapun-an og input fields ang mga existing rows
+        loadExistingYieldData();
+    });
+    
+    closeAddColumnModal();
+    alert("Column added!");
+  });
+}
+
+async function loadColumnDefinitions() {
+  const snap = await db.ref(`globalColumnDefinitions`).once("value");
+  if (snap.exists()) {
+    const columns = snap.val();
+    const thead = document.getElementById("yieldTableHead");
+    
+    // Limpyohan ang karaan nga custom columns
+    thead.querySelectorAll(".customColumn").forEach(th => th.remove());
+    
+    // I-add ang mga columns gikan sa Firebase
+    Object.keys(columns).forEach(colName => {
+      const newTh = document.createElement("th");
+      newTh.className = "customColumn";
+      // Gidugangan og Delete Button (🗑️)
+      newTh.innerHTML = `
+        <span>${colName}</span> 
+        <div style="display:flex; gap:2px; margin-top:5px;">
+          <button onclick="editColumnName(this)" style="background:none; border:none; cursor:pointer; font-size:12px;">✏️</button>
+          <button onclick="deleteColumn(this)" style="background:none; border:none; cursor:pointer; font-size:12px;">🗑️</button>
+        </div>`;
+      thead.querySelector("tr").insertBefore(newTh, thead.querySelector("tr").lastElementChild);
+    });
+  }
+}
+
+function editColumnName(button) {
+  const thElement = button.parentElement;
+  const spanElement = thElement.querySelector("span");
+  const oldName = spanElement.textContent;
+  
+  const newName = prompt("Enter new column name:", oldName);
+  
+  if (newName && newName.trim() !== "" && newName !== oldName) {
+    const newNameTrimmed = newName.trim();
+    
+    // Update the header
+    spanElement.textContent = newNameTrimmed;
+    
+    // Update all row data with the new column name
+    const tbody = document.querySelector("#yieldTable tbody");
+    const columnIndex = Array.from(thElement.parentElement.children).indexOf(thElement);
+    
+    tbody.querySelectorAll("tr").forEach(row => {
+      // Update data attributes for saving
+      const input = row.children[columnIndex]?.querySelector("input");
+      if(input) {
+        input.dataset.columnName = newNameTrimmed;
+      }
+    });
+    
+    // Delete old column from Firebase and add new one
+    db.ref(`globalColumnDefinitions/${oldName}`).remove();
+    db.ref(`globalColumnDefinitions/${newNameTrimmed}`).set(true);
+    
+    alert("Column renamed to: " + newNameTrimmed);
+  }
+}
+
+
+function deleteColumn(button) {
+  const thElement = button.closest('th');
+  const colName = thElement.querySelector("span").textContent;
+
+  if (confirm(`Sigurado ka nga papason nimo ang column nga "${colName}"? Ma-delete pud ang data niini sa tanang tanom.`)) {
+    // 1. Papason sa Firebase definitions
+    db.ref(`globalColumnDefinitions/${colName}`).remove()
+      .then(() => {
+        // 2. I-refresh ang UI
+        loadColumnDefinitions(); // I-reload ang headers
+        loadExistingYieldData();  // I-reload ang rows para mawala ang input cells
+        alert("Column deleted!");
+      })
+      .catch((error) => {
+        console.error("Error deleting column:", error);
+        alert("Failed to delete column.");
+      });
+  }
+}
+
+
 
 
 
   loadSensorRange();
+ 
 </script>
 
 </body>
